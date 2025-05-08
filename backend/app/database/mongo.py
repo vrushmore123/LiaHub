@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ASCENDING
 
-MONGO_URL = "mongodb://localhost:27017"  # Update if needed
-client = AsyncIOMotorClient(MONGO_URL)
-
-db = client.liahub  # database name
+client = AsyncIOMotorClient("mongodb://localhost:27017")
+db = client.liahub_db  # Database name
+courses_collection = db.courses  # Collection

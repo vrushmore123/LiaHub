@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import courses  # Correct import
+from app.routers import auth
 
 app = FastAPI()
 
@@ -20,3 +21,4 @@ async def root():
 
 # Include course routes
 app.include_router(courses.router)
+app.include_router(auth.router)

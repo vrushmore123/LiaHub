@@ -1,22 +1,70 @@
-# API routes (courses APIs)
-from fastapi import APIRouter
-from app.models.course import Course
+# courses.py
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, HttpUrl
+from typing import Optional, List
+from datetime import datetime
+from uuid import uuid4
+from app.database.mongo import courses_collection  # <- import from db.py
+from app.models.course import CourseInDB,CourseCreate,CourseBase
+from bson import ObjectId
 
-router = APIRouter()  # This defines the router
+router = APIRouter()
 
-# Simulated course data (can be fetched from DB or API)
-courses = [
-    {"id": 1, "name": "Course 1", "description": "This is course 1", "price": 99.99},
-    {"id": 2, "name": "Course 2", "description": "This is course 2", "price": 199.99},
-]
+class CourseBase(BaseModel):
+    name: str
+    description: str
+    imageUrl: Optional[HttpUrl] = None
+    category: str = "General"
 
-@router.get("/courses")
+class CourseCreate(CourseBase):
+    pass
+
+class CourseInDB(CourseBase):
+    id: str
+    createdAt: datetime
+    updatedAt: Optional[datetime] = None
+
+@router.get("/courses", response_model=List[CourseInDB])
 async def get_courses():
-    return courses
+    courses = await courses_collection.find().to_list(100)
+    return [
+        CourseInDB(
+            id=str(course["_id"]),
+            name=course["name"],
+            description=course["description"],
+            imageUrl=course.get("imageUrl"),
+            category=course.get("category", "General"),
+            createdAt=course["createdAt"],
+            updatedAt=course.get("updatedAt"),
+        )
+        for course in courses
+    ]
 
-@router.get("/courses/{course_id}")
-async def get_course(course_id: int):
-    course = next((c for c in courses if c["id"] == course_id), None)
-    if course:
-        return course
-    return {"error": "Course not found"}
+@router.get("/courses/{course_id}", response_model=CourseInDB)
+async def get_course(course_id: str):
+    course = await courses_collection.find_one({"_id": ObjectId(course_id)})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return CourseInDB(
+        id=str(course["_id"]),
+        name=course["name"],
+        description=course["description"],
+        imageUrl=course.get("imageUrl"),
+        category=course.get("category", "General"),
+        createdAt=course["createdAt"],
+        updatedAt=course.get("updatedAt"),
+    )
+
+@router.post("/courses", response_model=CourseInDB)
+async def create_course(course: CourseCreate):
+    new_course = {
+        "name": course.name,
+        "description": course.description,
+        "imageUrl": str(course.imageUrl) if course.imageUrl else f"https://via.placeholder.com/400x200/3b82f6/FFFFFF?text={course.name.replace(' ', '+')}",
+
+        "category": course.category,
+        "createdAt": datetime.utcnow(),
+        "updatedAt": None
+    }
+    result = await courses_collection.insert_one(new_course)
+    return CourseInDB(id=str(result.inserted_id), **new_course)

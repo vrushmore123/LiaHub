@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from app.models.user import UserRegister, UserLogin
 from app.models.student import StudentRegister, StudentLogin
 from app.database.mongo import db
+import bcrypt
 
 router = APIRouter()
 
@@ -11,7 +12,10 @@ async def register_user(user: UserRegister):
     user_exist = await db.users.find_one({"username": user.username})
     if user_exist:
         raise HTTPException(status_code=400, detail="Username already exists")
-    await db.users.insert_one(user.dict())
+    hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt())
+    user_dict = user.dict()
+    user_dict["password"] = hashed_password
+    await db.users.insert_one(user_dict)
     return {"message": "User registered successfully"}
 
 # Register Student
